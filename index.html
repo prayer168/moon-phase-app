@@ -634,7 +634,10 @@ function drawMoon(ctx, cx, cy, r, angle, floatMode) {
   var termAbs = Math.abs(Math.cos(rad) * r);
 
   ctx.save();
-  ctx.clearRect(cx - r - 8, cy - r - 8, r * 2 + 16, r * 2 + 16);
+  // In floatMode, skip clearRect — it would punch a visible rectangle hole in the background
+  if (!floatMode) {
+    ctx.clearRect(cx - r - 8, cy - r - 8, r * 2 + 16, r * 2 + 16);
+  }
 
   // outer glow halo
   if (illum > 0.04) {

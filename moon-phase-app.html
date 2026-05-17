@@ -648,7 +648,7 @@ function drawMoon(ctx, cx, cy, r, angle, floatMode) {
     ctx.fillStyle = glowR; ctx.fill();
   }
 
-  // dark base (skip in floatMode — dark side becomes fully transparent)
+  // dark base
   if (!floatMode) {
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
     var darkG = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
@@ -666,6 +666,12 @@ function drawMoon(ctx, cx, cy, r, angle, floatMode) {
       esG.addColorStop(1, 'rgba(20,40,100,0)');
       ctx.fillStyle = esG; ctx.fill();
     }
+  } else {
+    // floatMode: very subtle disc so the moon shape is always visible
+    // (prevents new moon from being completely invisible mid-animation)
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
+    ctx.fillStyle = 'rgba(28, 52, 95, 0.18)';
+    ctx.fill();
   }
 
   if (illum < 0.01) { ctx.restore(); return; }
@@ -1461,43 +1467,49 @@ function drawOrbitDiagram(angle) {
   ctx.strokeStyle = 'rgba(70,110,190,0.30)'; ctx.lineWidth = 1;
   ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
 
-  // 8 phase markers
-  // diagramAngle = (180 - phaseAngle) * PI/180  so new moon (0deg) is on sun side (left)
-  var miniR = Math.max(11, Math.min(W,H) * 0.033);
+  // 8 phase reference markers — dot + label only (no static images)
+  // keeping them as small dots lets the single animated moon be the focus
+  var dotR = Math.max(3, Math.min(W, H) * 0.010);
   for (var pi3 = 0; pi3 < 8; pi3++) {
     var pa = PHASES[pi3].angle;
     var da = (180 - pa) * PI / 180;
     var pmx = cx + orbitR * Math.cos(da);
     var pmy = cy - orbitR * Math.sin(da);
-    drawMoon(ctx, pmx, pmy, miniR, pa, true);
+
+    // Dot
+    ctx.beginPath(); ctx.arc(pmx, pmy, dotR, 0, PI*2);
+    ctx.fillStyle = 'rgba(100,150,220,0.45)'; ctx.fill();
 
     // Label on outer rim
-    var labelR = orbitR + miniR + 16;
+    var labelR = orbitR + dotR + 20;
     var lx = cx + labelR * Math.cos(da);
     var ly = cy - labelR * Math.sin(da);
-    ctx.fillStyle = 'rgba(150,195,240,0.72)';
+    ctx.fillStyle = 'rgba(148,195,240,0.65)';
     ctx.font = '0.58rem Arial,sans-serif'; ctx.textAlign = 'center';
     ctx.fillText(PHASES[pi3].name, lx, ly + 4);
   }
 
-  // Current moon position highlight
+  // Current moon — continuously animated position & phase
   var curDa = (180 - angle) * PI / 180;
   var moonDX = cx + orbitR * Math.cos(curDa);
   var moonDY = cy - orbitR * Math.sin(curDa);
+  var miniR = Math.max(14, Math.min(W, H) * 0.040);
 
-  // Dashed line from Earth to current moon
+  // Line from Earth to moon
   ctx.setLineDash([3, 3]);
-  ctx.strokeStyle = 'rgba(255,215,60,0.32)';
+  ctx.strokeStyle = 'rgba(255,215,60,0.28)';
   ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(moonDX, moonDY); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Highlight ring
-  ctx.beginPath(); ctx.arc(moonDX, moonDY, miniR + 5, 0, PI*2);
-  ctx.strokeStyle = 'rgba(255,220,60,0.65)'; ctx.lineWidth = 2; ctx.stroke();
+  // Outer glow pulse ring
+  ctx.beginPath(); ctx.arc(moonDX, moonDY, miniR + 7, 0, PI*2);
+  ctx.strokeStyle = 'rgba(255,220,60,0.40)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(moonDX, moonDY, miniR + 4, 0, PI*2);
+  ctx.strokeStyle = 'rgba(255,235,100,0.22)'; ctx.lineWidth = 1; ctx.stroke();
 
-  // Current moon (slightly larger)
-  drawMoon(ctx, moonDX, moonDY, miniR + 2, angle, true);
+  // Moon with continuous phase
+  drawMoon(ctx, moonDX, moonDY, miniR, angle, true);
 
   // Earth at center
   var eR = Math.min(W,H) * 0.043;

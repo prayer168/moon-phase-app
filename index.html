@@ -1100,13 +1100,13 @@ function drawObserverView(angle) {
   // ---- MOON ----
   if (moonVisible) {
     if (altFrac > 0) {
-      drawMoon(ctx, moonX, moonY, moonR, angle);
+      drawMoon(ctx, moonX, moonY, moonR, angle, true);
     } else {
       // Near horizon: show partial rise/set with fade
       ctx.save();
       ctx.rect(0, 0, W, horizonY);
       ctx.clip();
-      drawMoon(ctx, moonX, moonY, moonR, angle);
+      drawMoon(ctx, moonX, moonY, moonR, angle, true);
       ctx.restore();
     }
     // Moon label
@@ -1466,7 +1466,7 @@ function drawOrbitDiagram(angle) {
     var da = (180 - pa) * PI / 180;
     var pmx = cx + orbitR * Math.cos(da);
     var pmy = cy - orbitR * Math.sin(da);
-    drawMoon(ctx, pmx, pmy, miniR, pa);
+    drawMoon(ctx, pmx, pmy, miniR, pa, true);
 
     // Label on outer rim
     var labelR = orbitR + miniR + 16;
@@ -1494,7 +1494,7 @@ function drawOrbitDiagram(angle) {
   ctx.strokeStyle = 'rgba(255,220,60,0.65)'; ctx.lineWidth = 2; ctx.stroke();
 
   // Current moon (slightly larger)
-  drawMoon(ctx, moonDX, moonDY, miniR + 2, angle);
+  drawMoon(ctx, moonDX, moonDY, miniR + 2, angle, true);
 
   // Earth at center
   var eR = Math.min(W,H) * 0.043;

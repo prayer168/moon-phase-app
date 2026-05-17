@@ -574,7 +574,8 @@ function updateLabels() {
 // 盈凸月：填整圓 → 擦掉左側月牙（左弧 + 橢圓左弧圍成）
 // 虧凸月：填整圓 → 擦掉右側月牙（右弧 + 橢圓右弧圍成）
 // 殘月：左半圓填亮 → 擦掉「橢圓內部左半」，剩下月牙
-function drawMoon(ctx, cx, cy, r, angle) {
+// floatMode=true: skip dark base → transparent dark side, moon floats over background
+function drawMoon(ctx, cx, cy, r, angle, floatMode) {
   var PI = Math.PI;
   var rad = angle * PI / 180;
   var illum = (1 - Math.cos(rad)) / 2;
@@ -593,22 +594,24 @@ function drawMoon(ctx, cx, cy, r, angle) {
     ctx.fillStyle = glowR; ctx.fill();
   }
 
-  // dark base
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
-  var darkG = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  darkG.addColorStop(0, '#131e30');
-  darkG.addColorStop(1, '#060c18');
-  ctx.fillStyle = darkG; ctx.fill();
-
-  // earthshine: faint blue glow on dark side
-  if (illum > 0.02 && illum < 0.95) {
+  // dark base (skip in floatMode — dark side becomes fully transparent)
+  if (!floatMode) {
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
-    var esX = waxing ? cx - r * 0.25 : cx + r * 0.25;
-    var esG = ctx.createRadialGradient(esX, cy, 0, cx, cy, r);
-    esG.addColorStop(0, 'rgba(50,90,170,0.13)');
-    esG.addColorStop(0.7, 'rgba(30,60,130,0.06)');
-    esG.addColorStop(1, 'rgba(20,40,100,0)');
-    ctx.fillStyle = esG; ctx.fill();
+    var darkG = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    darkG.addColorStop(0, '#131e30');
+    darkG.addColorStop(1, '#060c18');
+    ctx.fillStyle = darkG; ctx.fill();
+
+    // earthshine: faint blue glow on dark side
+    if (illum > 0.02 && illum < 0.95) {
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
+      var esX = waxing ? cx - r * 0.25 : cx + r * 0.25;
+      var esG = ctx.createRadialGradient(esX, cy, 0, cx, cy, r);
+      esG.addColorStop(0, 'rgba(50,90,170,0.13)');
+      esG.addColorStop(0.7, 'rgba(30,60,130,0.06)');
+      esG.addColorStop(1, 'rgba(20,40,100,0)');
+      ctx.fillStyle = esG; ctx.fill();
+    }
   }
 
   if (illum < 0.01) { ctx.restore(); return; }
@@ -735,8 +738,8 @@ function drawEarthView(angle) {
   var w = canvas.width, h = canvas.height;
   // Full clear — let the Three.js scene show through
   ctx.clearRect(0, 0, w, h);
-  // Draw moon centered; r=42 leaves glow room (42*1.4+60=118.8 < 120)
-  drawMoon(ctx, w / 2, h / 2, 42, angle);
+  // floatMode=true: transparent dark side, only lit portion visible
+  drawMoon(ctx, w / 2, h / 2, 42, angle, true);
 }
 
 // ===== PHASE INFO =====

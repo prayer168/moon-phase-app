@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>月相變化</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --header-h:54px;
+  --ctrl-h:68px;
+  --panel-w:290px;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bot:env(safe-area-inset-bottom,0px);
+  --accent:#4fa3e0;
+  --bg-dark:#040d1a;
+  --glass:rgba(8,22,45,0.82);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg-dark);color:#d0e4f7;font-family:'Segoe UI',Arial,sans-serif;}
+
+/* HEADER */
+#header{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  height:var(--header-h);
+  padding-top:var(--safe-top);
+  background:rgba(4,13,26,0.95);
+  border-bottom:1px solid rgba(79,163,224,0.18);
+  display:flex;align-items:center;justify-content:space-between;
+  padding-left:16px;padding-right:12px;
+}
+#header h1{font-size:1.05rem;font-weight:600;letter-spacing:.04em;color:#a8d4f5;}
+#header h1 span{color:var(--accent);}
+#btnQuiz{
+  background:rgba(79,163,224,0.15);border:1px solid rgba(79,163,224,0.4);
+  color:var(--accent);border-radius:20px;padding:5px 14px;font-size:.82rem;cursor:pointer;
+  transition:background .2s;
+}
+#btnQuiz:hover{background:rgba(79,163,224,0.28);}
+
+/* APP GRID */
+#app{
+  position:fixed;
+  top:calc(var(--header-h) + var(--safe-top));
+  bottom:0;left:0;right:0;
+  display:grid;
+  grid-template-columns:1fr var(--panel-w);
+  grid-template-rows:1fr var(--ctrl-h);
+}
+
+/* 3D CANVAS CONTAINER */
+#sceneWrap{
+  grid-column:1;grid-row:1;
+  position:relative;overflow:hidden;
+  background:var(--bg-dark);
+}
+#threeCanvas{display:block;width:100%;height:100%;}
+
+/* STAR OVERLAY LABELS */
+.label3d{
+  position:absolute;pointer-events:none;
+  font-size:.7rem;color:rgba(200,220,255,0.6);
+  text-align:center;transform:translateX(-50%);
+  text-shadow:0 0 6px #000;
+}
+
+/* EARTH-VIEW CANVAS */
+#earthViewWrap{
+  position:absolute;bottom:12px;left:12px;
+  background:rgba(4,13,26,0.85);
+  border:1px solid rgba(79,163,224,0.25);
+  border-radius:10px;padding:8px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  backdrop-filter:blur(6px);
+}
+#earthViewCanvas{border-radius:50%;display:block;}
+#earthViewLabel{font-size:.65rem;color:rgba(160,200,240,0.7);letter-spacing:.05em;}
+
+/* SIDE PANEL */
+#sidePanel{
+  grid-column:2;grid-row:1 / span 1;
+  background:var(--glass);
+  border-left:1px solid rgba(79,163,224,0.15);
+  overflow-y:auto;
+  padding:14px 14px 8px;
+  display:flex;flex-direction:column;gap:12px;
+  backdrop-filter:blur(10px);
+}
+#sidePanel::-webkit-scrollbar{width:4px;}
+#sidePanel::-webkit-scrollbar-thumb{background:rgba(79,163,224,0.3);border-radius:2px;}
+
+.card{
+  background:rgba(10,28,55,0.7);
+  border:1px solid rgba(79,163,224,0.15);
+  border-radius:10px;padding:12px;
+}
+.card-title{font-size:.7rem;color:rgba(160,200,240,0.5);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;}
+
+/* MOON CANVAS CARD */
+#moonCanvasWrap{display:flex;justify-content:center;}
+#moonCanvas{border-radius:50%;display:block;}
+
+#phaseNameZh{font-size:1.3rem;font-weight:700;color:#e8f4ff;text-align:center;margin-top:6px;}
+#phaseNameEn{font-size:.75rem;color:rgba(160,200,240,0.55);text-align:center;margin-top:2px;}
+#illuminPct{font-size:.8rem;color:var(--accent);text-align:center;margin-top:4px;}
+
+/* PHASE GRID */
+#phaseGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.phaseDot{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  cursor:pointer;padding:4px 2px;border-radius:6px;
+  transition:background .15s;
+}
+.phaseDot:hover{background:rgba(79,163,224,0.15);}
+.phaseDot.active{background:rgba(79,163,224,0.22);outline:1px solid rgba(79,163,224,0.4);}
+.phaseDot canvas{border-radius:50%;display:block;}
+.phaseDot span{font-size:.58rem;color:rgba(160,200,240,0.65);text-align:center;line-height:1.2;}
+
+/* INFO CARD */
+#infoText{font-size:.78rem;line-height:1.6;color:rgba(180,210,240,0.85);}
+#infoText strong{color:var(--accent);font-weight:600;}
+
+/* LUNAR DATE */
+#lunarBox{font-size:.8rem;color:rgba(200,230,255,0.75);text-align:center;line-height:1.8;}
+#lunarDate{font-size:1rem;color:#ffd580;font-weight:600;}
+
+/* CONTROL BAR */
+#ctrlBar{
+  grid-column:1 / span 2;grid-row:2;
+  background:rgba(4,13,26,0.96);
+  border-top:1px solid rgba(79,163,224,0.15);
+  display:flex;align-items:center;gap:10px;
+  padding:0 16px;
+  padding-bottom:var(--safe-bot);
+}
+.ctrl-btn{
+  background:none;border:none;cursor:pointer;
+  color:#a8d4f5;font-size:1.1rem;padding:6px;
+  border-radius:6px;transition:background .15s;flex-shrink:0;
+}
+.ctrl-btn:hover{background:rgba(79,163,224,0.18);}
+.ctrl-btn.active{color:#ffd580;}
+
+#timeline{
+  flex:1;-webkit-appearance:none;appearance:none;
+  height:4px;background:rgba(79,163,224,0.2);
+  border-radius:2px;outline:none;cursor:pointer;
+}
+#timeline::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;
+  background:var(--accent);border-radius:50%;cursor:pointer;
+}
+#timeline::-moz-range-thumb{width:14px;height:14px;background:var(--accent);border-radius:50%;border:none;}
+
+#dayCounter{font-size:.78rem;color:rgba(160,200,240,0.6);flex-shrink:0;min-width:42px;text-align:right;}
+
+.speed-btn{
+  background:rgba(79,163,224,0.08);
+  border:1px solid rgba(79,163,224,0.2);
+  color:rgba(160,200,240,0.7);
+  border-radius:4px;padding:3px 8px;font-size:.72rem;cursor:pointer;
+  transition:all .15s;flex-shrink:0;
+}
+.speed-btn:hover,.speed-btn.sel{background:rgba(79,163,224,0.25);color:#a8d4f5;border-color:rgba(79,163,224,0.5);}
+
+/* BOTTOM DRAWER (mobile) */
+#bottomDrawer{
+  display:none;
+  position:fixed;bottom:0;left:0;right:0;z-index:80;
+  background:rgba(4,13,26,0.97);
+  border-radius:16px 16px 0 0;
+  border-top:1px solid rgba(79,163,224,0.2);
+  transform:translateY(calc(100% - 46px));
+  transition:transform .35s cubic-bezier(.4,0,.2,1);
+  max-height:75vh;
+  flex-direction:column;
+}
+#bottomDrawer.open{transform:translateY(0);}
+#drawerHandle{
+  width:100%;height:46px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;
+  gap:8px;
+}
+#drawerHandle::before{
+  content:'';display:block;width:36px;height:4px;
+  background:rgba(79,163,224,0.35);border-radius:2px;
+}
+#drawerHandle span{font-size:.75rem;color:rgba(160,200,240,0.55);}
+#drawerContent{overflow-y:auto;padding:0 16px 16px;flex:1;}
+
+/* QUIZ OVERLAY */
+#quizOverlay{
+  display:none;
+  position:fixed;inset:0;z-index:200;
+  background:rgba(2,8,18,0.95);
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;padding:24px;
+}
+#quizOverlay.show{display:flex;}
+#quizClose{
+  position:absolute;top:16px;right:16px;
+  background:none;border:none;color:rgba(160,200,240,0.5);
+  font-size:1.4rem;cursor:pointer;
+}
+#quizTitle{font-size:1rem;color:var(--accent);letter-spacing:.05em;}
+#quizQuestion{font-size:.95rem;color:#cde;text-align:center;line-height:1.5;}
+#quizMoonWrap{position:relative;}
+#quizMoonCanvas{border-radius:50%;display:block;}
+#quizOptions{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:340px;}
+.quiz-opt{
+  background:rgba(10,28,55,0.8);
+  border:1px solid rgba(79,163,224,0.25);
+  color:#c8e0f4;border-radius:10px;padding:10px;
+  font-size:.85rem;cursor:pointer;text-align:center;
+  transition:all .15s;
+}
+.quiz-opt:hover{background:rgba(79,163,224,0.2);}
+.quiz-opt.correct{background:rgba(40,180,80,0.25);border-color:#40c060;color:#90ffa0;}
+.quiz-opt.wrong{background:rgba(200,40,40,0.2);border-color:#c03030;color:#ffa0a0;}
+#quizFeedback{font-size:.88rem;text-align:center;min-height:40px;color:#cde;line-height:1.5;}
+#quizScore{font-size:.8rem;color:rgba(160,200,240,0.5);}
+#btnNextQ{
+  background:rgba(79,163,224,0.2);border:1px solid rgba(79,163,224,0.4);
+  color:var(--accent);border-radius:20px;padding:8px 24px;
+  font-size:.88rem;cursor:pointer;display:none;
+}
+#btnNextQ:hover{background:rgba(79,163,224,0.35);}
+
+/* CONFETTI CANVAS */
+#confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:300;}
+
+/* OBSERVER MODE */
+#observerView{
+  display:none;position:absolute;inset:0;z-index:10;
+  background:var(--bg-dark);
+}
+#observerCanvas{display:block;width:100%;height:100%;}
+#observerInfo{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  background:rgba(4,13,26,0.82);border:1px solid rgba(79,163,224,0.2);
+  border-radius:8px;padding:6px 16px;font-size:.78rem;color:rgba(180,210,240,0.8);
+  text-align:center;pointer-events:none;white-space:nowrap;
+}
+#btnView{
+  background:rgba(79,163,224,0.12);border:1px solid rgba(79,163,224,0.35);
+  color:rgba(160,200,240,0.9);border-radius:20px;padding:5px 13px;
+  font-size:.8rem;cursor:pointer;transition:background .2s;
+}
+#btnView:hover{background:rgba(79,163,224,0.25);}
+
+/* RESPONSIVE */
+@media (max-width:640px),(max-width:900px) and (orientation:portrait){
+  :root{--panel-w:0px;--ctrl-h:60px;}
+  #app{grid-template-columns:1fr;}
+  #sidePanel{display:none;}
+  #bottomDrawer{display:flex;}
+  .speed-btn{display:none;}
+  #ctrlBar{gap:8px;padding:0 10px;padding-bottom:var(--safe-bot);}
+  #earthViewWrap{bottom:70px;}
+}
+@media (min-width:641px) and (max-width:900px) and (orientation:landscape){
+  :root{--panel-w:250px;}
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>月相變化</h1>
+  <div style="display:flex;gap:8px;">
+    <button id="btnView">地球視角</button>
+    <button id="btnQuiz">測驗模式</button>
+  </div>
+</div>
+
+<div id="app">
+  <div id="sceneWrap">
+    <canvas id="threeCanvas"></canvas>
+    <div class="label3d" id="labelSun">太陽</div>
+    <div class="label3d" id="labelEarth">地球</div>
+    <div class="label3d" id="labelMoon">月球</div>
+    <div id="earthViewWrap">
+      <canvas id="earthViewCanvas" width="80" height="80"></canvas>
+      <div id="earthViewLabel">地球視角</div>
+    </div>
+    <div id="observerView">
+      <canvas id="observerCanvas"></canvas>
+      <div id="observerInfo">子夜 00:00・面向南方</div>
+    </div>
+  </div>
+
+  <div id="sidePanel">
+    <div class="card">
+      <div class="card-title">目前月相</div>
+      <div id="moonCanvasWrap"><canvas id="moonCanvas" width="110" height="110"></canvas></div>
+      <div id="phaseNameZh">新月</div>
+      <div id="phaseNameEn">New Moon</div>
+      <div id="illuminPct">亮面：0%</div>
+    </div>
+    <div class="card">
+      <div class="card-title">農曆對照</div>
+      <div id="lunarBox">
+        農曆初 <span id="lunarDate">1</span> 日<br>
+        <span id="lunarDesc" style="font-size:.72rem;color:rgba(160,200,240,0.5);"></span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">八個主要月相</div>
+      <div id="phaseGrid"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">學習重點</div>
+      <div id="infoText"></div>
+    </div>
+  </div>
+
+  <div id="ctrlBar">
+    <button class="ctrl-btn" id="btnPlay" title="播放/暫停">&#9654;</button>
+    <input type="range" id="timeline" min="0" max="3600" value="0">
+    <div id="dayCounter">第 1 天</div>
+    <button class="speed-btn sel" data-s="1">1x</button>
+    <button class="speed-btn" data-s="2">2x</button>
+    <button class="speed-btn" data-s="4">4x</button>
+    <button class="speed-btn" data-s="0.3">0.3x</button>
+  </div>
+</div>
+
+<!-- BOTTOM DRAWER (mobile) -->
+<div id="bottomDrawer">
+  <div id="drawerHandle"><span id="drawerLabel">月相資訊</span></div>
+  <div id="drawerContent">
+    <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:14px;">
+      <canvas id="moonCanvasMobile" width="80" height="80" style="border-radius:50%;flex-shrink:0;"></canvas>
+      <div>
+        <div id="phaseNameZhM" style="font-size:1.1rem;font-weight:700;color:#e8f4ff;margin-bottom:4px;">新月</div>
+        <div id="phaseNameEnM" style="font-size:.75rem;color:rgba(160,200,240,0.55);margin-bottom:4px;">New Moon</div>
+        <div id="illuminPctM" style="font-size:.8rem;color:var(--accent);">亮面：0%</div>
+        <div id="lunarDateM" style="font-size:.78rem;color:#ffd580;margin-top:4px;">農曆初 1 日</div>
+      </div>
+    </div>
+    <div id="infoTextM" style="font-size:.78rem;line-height:1.6;color:rgba(180,210,240,0.85);"></div>
+    <div id="phaseGridM" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px;"></div>
+  </div>
+</div>
+
+<!-- QUIZ OVERLAY -->
+<div id="quizOverlay">
+  <button id="quizClose">&#10005;</button>
+  <div id="quizTitle">月相測驗</div>
+  <div id="quizScore">答對 0 / 0</div>
+  <div id="quizQuestion">這是哪個月相？</div>
+  <div id="quizMoonWrap"><canvas id="quizMoonCanvas" width="110" height="110" style="border-radius:50%;"></canvas></div>
+  <div id="quizOptions"></div>
+  <div id="quizFeedback"></div>
+  <button id="btnNextQ">下一題</button>
+</div>
+
+<canvas id="confettiCanvas"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ===== PHASE DATA =====
+var PHASES = [
+  {name:'新月',      en:'New Moon',          angle:0,   lunar:'初一',  info:'月球位於太陽與地球之間，受光面朝向太陽，地球上看不見月球。'},
+  {name:'眉形月',    en:'Waxing Crescent',   angle:45,  lunar:'初四',  info:'月球漸漸遠離太陽，右側出現細弧形亮面，月亮在傍晚西方低空可見。'},
+  {name:'上弦月',    en:'First Quarter',     angle:90,  lunar:'初七',  info:'月球繞行四分之一圈，右半球受光，傍晚出現在南方天空，半夜西沉。'},
+  {name:'盈凸月',    en:'Waxing Gibbous',    angle:135, lunar:'十一',  info:'亮面超過一半，繼續增大中，日落後不久升起，大部分夜晚可見。'},
+  {name:'滿月',      en:'Full Moon',         angle:180, lunar:'十五',  info:'月球位於太陽對面，整個受光面朝向地球，日落時升起，整夜可見。'},
+  {name:'虧凸月',    en:'Waning Gibbous',    angle:225, lunar:'十八',  info:'滿月後亮面開始縮小，左側大半仍亮，午夜後升起，清晨可見。'},
+  {name:'下弦月',    en:'Last Quarter',      angle:270, lunar:'廿二',  info:'月球再行四分之一圈，左半球受光，午夜升起，清晨仍在南方天空。'},
+  {name:'殘月',      en:'Waning Crescent',   angle:315, lunar:'廿六',  info:'左側只剩細弧形亮面，清晨東方天空可見，即將回到新月。'}
+];
+
+// ===== STATE =====
+var moonAngle = 0;
+var isPlaying = true;
+var speedVal = 1;
+var drawerOpen = false;
+var quizCorrect = 0;
+var quizTotal = 0;
+var quizPhaseIdx = 0;
+var quizAnswered = false;
+var confettiParticles = [];
+
+// ===== THREE.JS SETUP =====
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
+
+var canvas3d = document.getElementById('threeCanvas');
+var renderer = new THREE.WebGLRenderer({canvas: canvas3d, antialias: true, alpha: false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x020810, 1);
+
+// Stars background
+(function() {
+  var starGeo = new THREE.BufferGeometry();
+  var starCount = 1200;
+  var positions = new Float32Array(starCount * 3);
+  for (var i = 0; i < starCount * 3; i++) {
+    positions[i] = (Math.random() - 0.5) * 300;
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  var starMat = new THREE.PointsMaterial({color: 0xaabbdd, size: 0.35});
+  scene.add(new THREE.Points(starGeo, starMat));
+})();
+
+// Sun
+var sunMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(1.8, 32, 32),
+  new THREE.MeshBasicMaterial({color: 0xff8c1a})
+);
+sunMesh.add(new THREE.Mesh(
+  new THREE.SphereGeometry(2.6, 32, 32),
+  new THREE.MeshBasicMaterial({color: 0xff6600, transparent: true, opacity: 0.1, side: THREE.BackSide})
+));
+var sunLight = new THREE.PointLight(0xfffae8, 2.8, 200);
+sunMesh.add(sunLight);
+scene.add(sunMesh);
+scene.add(new THREE.AmbientLight(0x112244, 0.25));
+
+// Earth orbit ring (inner glow + outer ring)
+scene.add(new THREE.Mesh(
+  new THREE.TorusGeometry(8, 0.055, 16, 120),
+  new THREE.MeshBasicMaterial({color: 0x4488cc, transparent: true, opacity: 0.55})
+));
+scene.add(new THREE.Mesh(
+  new THREE.TorusGeometry(8, 0.12, 16, 120),
+  new THREE.MeshBasicMaterial({color: 0x2255aa, transparent: true, opacity: 0.18})
+));
+
+// Earth
+var earthMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(1.0, 32, 32),
+  new THREE.MeshPhongMaterial({color: 0x1a5fa5, specular: 0x336699, shininess: 25})
+);
+earthMesh.position.set(8, 0, 0);
+
+scene.add(earthMesh);
+
+// Moon orbit (child of earthMesh so it moves with earth -- NO, earth is fixed at 8,0,0; orbit group rotates)
+var orbitGroup = new THREE.Group();
+earthMesh.add(orbitGroup);
+
+// Moon orbit ring (around earth) - inner + glow
+var moonOrbitRing = new THREE.Mesh(
+  new THREE.TorusGeometry(4.5, 0.04, 16, 80),
+  new THREE.MeshBasicMaterial({color: 0x66aadd, transparent: true, opacity: 0.6})
+);
+moonOrbitRing.rotation.x = Math.PI / 2;
+earthMesh.add(moonOrbitRing);
+var moonOrbitGlow = new THREE.Mesh(
+  new THREE.TorusGeometry(4.5, 0.10, 16, 80),
+  new THREE.MeshBasicMaterial({color: 0x3366aa, transparent: true, opacity: 0.2})
+);
+moonOrbitGlow.rotation.x = Math.PI / 2;
+earthMesh.add(moonOrbitGlow);
+
+var moonMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.35, 32, 32),
+  new THREE.MeshPhongMaterial({color: 0xc0c8d0, specular: 0x334455, shininess: 8})
+);
+moonMesh.position.set(4.5, 0, 0);
+orbitGroup.add(moonMesh);
+
+// Camera spherical coords
+var camTheta = 0.4;
+var camPhi = 1.05;
+var camDist = 18;
+
+function updateCam() {
+  camera.position.setFromSphericalCoords(camDist, camPhi, camTheta);
+  camera.lookAt(0, 0, 0);
+}
+updateCam();
+
+// ===== RESIZE =====
+function onResize() {
+  var wrap = document.getElementById('sceneWrap');
+  var w = wrap.clientWidth;
+  var h = wrap.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', onResize);
+onResize();
+
+// ===== DRAG =====
+var isDragging = false;
+var prevMouse = {x: 0, y: 0};
+canvas3d.addEventListener('mousedown', function(e) {
+  isDragging = true;
+  prevMouse = {x: e.clientX, y: e.clientY};
+});
+window.addEventListener('mouseup', function() { isDragging = false; });
+window.addEventListener('mousemove', function(e) {
+  if (!isDragging) return;
+  camTheta -= (e.clientX - prevMouse.x) * 0.005;
+  camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi - (e.clientY - prevMouse.y) * 0.005));
+  prevMouse = {x: e.clientX, y: e.clientY};
+  updateCam();
+});
+
+// Touch drag
+var touchPrev = {x: 0, y: 0};
+var pinchDist0 = 0;
+canvas3d.addEventListener('touchstart', function(e) {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    touchPrev = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    var dx = e.touches[0].clientX - e.touches[1].clientX;
+    var dy = e.touches[0].clientY - e.touches[1].clientY;
+    pinchDist0 = Math.sqrt(dx*dx + dy*dy);
+  }
+}, {passive: true});
+canvas3d.addEventListener('touchend', function() { isDragging = false; pinchDist0 = 0; }, {passive: true});
+canvas3d.addEventListener('touchmove', function(e) {
+  if (e.touches.length === 1 && isDragging) {
+    var tx = e.touches[0].clientX;
+    var ty = e.touches[0].clientY;
+    camTheta -= (tx - touchPrev.x) * 0.005;
+    camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi - (ty - touchPrev.y) * 0.005));
+    touchPrev = {x: tx, y: ty};
+    updateCam();
+  } else if (e.touches.length === 2 && pinchDist0 > 0) {
+    var dx = e.touches[0].clientX - e.touches[1].clientX;
+    var dy = e.touches[0].clientY - e.touches[1].clientY;
+    var dist = Math.sqrt(dx*dx + dy*dy);
+    camDist = Math.max(6, Math.min(35, camDist - (dist - pinchDist0) * 0.05));
+    pinchDist0 = dist;
+    updateCam();
+  }
+  e.preventDefault();
+}, {passive: false});
+
+// Scroll zoom
+canvas3d.addEventListener('wheel', function(e) {
+  camDist = Math.max(6, Math.min(35, camDist + e.deltaY * 0.02));
+  updateCam();
+}, {passive: true});
+
+// ===== LABELS 3D->2D =====
+function updateLabels() {
+  var bodies = [
+    {mesh: sunMesh,   id: 'labelSun',   yOff: -2.2},
+    {mesh: earthMesh, id: 'labelEarth', yOff: -1.3},
+    {mesh: moonMesh,  id: 'labelMoon',  yOff: -0.55}
+  ];
+  var W = canvas3d.clientWidth;
+  var H = canvas3d.clientHeight;
+  for (var i = 0; i < bodies.length; i++) {
+    var el = document.getElementById(bodies[i].id);
+    var pos = new THREE.Vector3();
+    bodies[i].mesh.getWorldPosition(pos);
+    pos.y += bodies[i].yOff;
+    var pr = pos.clone().project(camera);
+    if (pr.z > 1) { el.style.display = 'none'; continue; }
+    el.style.display = 'block';
+    el.style.left = (pr.x * 0.5 + 0.5) * W + 'px';
+    el.style.top  = (pr.y * -0.5 + 0.5) * H + 'px';
+  }
+}
+
+// ===== CANVAS 2D MOON DRAW =====
+// 終結線幾何：橢圓 x 半軸 = termAbs = |cos(angle)| * r，y 半軸 = r
+// 漸盈（右亮）：右半圓填亮 → 擦掉「橢圓內部右半」，剩下月牙
+// 盈凸月：填整圓 → 擦掉左側月牙（左弧 + 橢圓左弧圍成）
+// 虧凸月：填整圓 → 擦掉右側月牙（右弧 + 橢圓右弧圍成）
+// 殘月：左半圓填亮 → 擦掉「橢圓內部左半」，剩下月牙
+function drawMoon(ctx, cx, cy, r, angle) {
+  var PI = Math.PI;
+  var rad = angle * PI / 180;
+  var illum = (1 - Math.cos(rad)) / 2;
+  var waxing = (angle <= 180);
+  var termAbs = Math.abs(Math.cos(rad) * r);
+
+  ctx.save();
+  ctx.clearRect(cx - r - 8, cy - r - 8, r * 2 + 16, r * 2 + 16);
+
+  // outer glow halo
+  if (illum > 0.04) {
+    var glowR = ctx.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * 1.4);
+    glowR.addColorStop(0, 'rgba(230,215,175,' + (illum * 0.22) + ')');
+    glowR.addColorStop(1, 'rgba(200,185,140,0)');
+    ctx.beginPath(); ctx.arc(cx, cy, r * 1.4, 0, PI * 2);
+    ctx.fillStyle = glowR; ctx.fill();
+  }
+
+  // dark base
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
+  var darkG = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  darkG.addColorStop(0, '#131e30');
+  darkG.addColorStop(1, '#060c18');
+  ctx.fillStyle = darkG; ctx.fill();
+
+  // earthshine: faint blue glow on dark side
+  if (illum > 0.02 && illum < 0.95) {
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
+    var esX = waxing ? cx - r * 0.25 : cx + r * 0.25;
+    var esG = ctx.createRadialGradient(esX, cy, 0, cx, cy, r);
+    esG.addColorStop(0, 'rgba(50,90,170,0.13)');
+    esG.addColorStop(0.7, 'rgba(30,60,130,0.06)');
+    esG.addColorStop(1, 'rgba(20,40,100,0)');
+    ctx.fillStyle = esG; ctx.fill();
+  }
+
+  if (illum < 0.01) { ctx.restore(); return; }
+
+  if (illum > 0.99) {
+    var fmG = ctx.createRadialGradient(cx - r * 0.18, cy - r * 0.18, 0, cx, cy, r);
+    fmG.addColorStop(0, '#fffef4');
+    fmG.addColorStop(0.45, '#ede2c2');
+    fmG.addColorStop(1, '#c5bc9a');
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
+    ctx.fillStyle = fmG; ctx.fill();
+    var maria = [
+      [cx - r*0.28, cy + r*0.14, r*0.22, 0.10],
+      [cx + r*0.18, cy - r*0.25, r*0.16, 0.09],
+      [cx - r*0.05, cy - r*0.40, r*0.13, 0.08],
+      [cx + r*0.40, cy + r*0.25, r*0.12, 0.08],
+      [cx + r*0.05, cy + r*0.42, r*0.10, 0.07],
+      [cx - r*0.45, cy - r*0.08, r*0.12, 0.09]
+    ];
+    for (var k = 0; k < maria.length; k++) {
+      ctx.globalAlpha = maria[k][3];
+      ctx.beginPath(); ctx.arc(maria[k][0], maria[k][1], maria[k][2], 0, PI*2);
+      ctx.fillStyle = '#8a7a62'; ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore(); return;
+  }
+
+  // clip to moon disc
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2); ctx.clip();
+
+  // lit-side gradient
+  var litG = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  litG.addColorStop(0, '#f8f4e0');
+  litG.addColorStop(0.55, '#e0d8bc');
+  litG.addColorStop(1, '#bfb898');
+
+  if (waxing) {
+    if (illum < 0.5) {
+      // ===== 眉形月 (Waxing Crescent) =====
+      // 畫右半圓，再擦掉橢圓內部右半（= 橢圓右弧 + 垂直中線 圍成的區域）
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      ctx.arc(cx, cy, r, -PI/2, PI/2, false); // 右弧 CW：頂→右→底
+      ctx.closePath(); // 垂直中線：底→頂
+      ctx.fillStyle = litG; ctx.fill();
+
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      // 橢圓右弧 CW：頂(cx,cy-r)→右(cx+termAbs,cy)→底(cx,cy+r)
+      ctx.ellipse(cx, cy, termAbs, r, 0, -PI/2, PI/2, false);
+      ctx.closePath(); // 垂直中線：底→頂
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+
+    } else {
+      // ===== 盈凸月 (Waxing Gibbous) =====
+      // 填整圓，擦掉左側暗月牙（左圓弧 + 橢圓左弧 圍成）
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
+      ctx.fillStyle = litG; ctx.fill();
+
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      // 左圓弧 CCW：頂→左→底
+      ctx.arc(cx, cy, r, -PI/2, PI/2, true);
+      // 橢圓左弧 CW（bottom→left→top）：從底沿橢圓左側回到頂
+      // anticlockwise=false 在 canvas(y-down)：底(PI/2)→左(PI)→頂(-PI/2) = 左弧向上
+      ctx.ellipse(cx, cy, termAbs, r, 0, PI/2, -PI/2, false);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+  } else {
+    if (illum > 0.5) {
+      // ===== 虧凸月 (Waning Gibbous) =====
+      // 填整圓，擦掉右側暗月牙（右圓弧 + 橢圓右弧 圍成）
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, PI * 2);
+      ctx.fillStyle = litG; ctx.fill();
+
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      // 右圓弧 CW：頂→右→底
+      ctx.arc(cx, cy, r, -PI/2, PI/2, false);
+      // 橢圓右弧 CCW（bottom→right→top）：從底沿橢圓右側回到頂
+      // anticlockwise=true 在 canvas(y-down)：底(PI/2)→右(0)→頂(-PI/2) = 右弧向上
+      ctx.ellipse(cx, cy, termAbs, r, 0, PI/2, -PI/2, true);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+
+    } else {
+      // ===== 殘月 (Waning Crescent) =====
+      // 畫左半圓，再擦掉橢圓內部左半（= 橢圓左弧 + 垂直中線 圍成的區域）
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      ctx.arc(cx, cy, r, -PI/2, PI/2, true); // 左弧 CCW：頂→左→底
+      ctx.closePath(); // 垂直中線：底→頂
+      ctx.fillStyle = litG; ctx.fill();
+
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      // 橢圓左弧 CCW：頂(cx,cy-r)→左(cx-termAbs,cy)→底(cx,cy+r)
+      // anticlockwise=true 在 canvas(y-down)：頂→左→底
+      ctx.ellipse(cx, cy, termAbs, r, 0, -PI/2, PI/2, true);
+      ctx.closePath(); // 垂直中線：底→頂
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+
+  ctx.restore();
+}
+
+// ===== EARTH-VIEW CANVAS =====
+function drawEarthView(angle) {
+  var canvas = document.getElementById('earthViewCanvas');
+  var ctx = canvas.getContext('2d');
+  var w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // night sky background
+  ctx.fillStyle = '#010810';
+  ctx.fillRect(0, 0, w, h);
+
+  // stars
+  ctx.fillStyle = 'rgba(180,210,255,0.6)';
+  var sPos = [[10,8],[25,15],[50,6],[68,20],[72,5],[15,55],[80,45],[40,70],[5,72],[88,65]];
+  for (var si = 0; si < sPos.length; si++) {
+    ctx.beginPath(); ctx.arc(sPos[si][0], sPos[si][1], 0.8, 0, Math.PI*2); ctx.fill();
+  }
+
+  // moon in sky
+  var mx = w * 0.5, my = h * 0.42;
+  drawMoon(ctx, mx, my, 22, angle);
+
+  // horizon
+  var grad = ctx.createLinearGradient(0, h*0.68, 0, h);
+  grad.addColorStop(0, '#1a3a20');
+  grad.addColorStop(1, '#0a1a0d');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, h*0.68, w, h*0.32);
+
+  // ground line
+  ctx.strokeStyle = 'rgba(60,120,60,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, h*0.68); ctx.lineTo(w, h*0.68); ctx.stroke();
+}
+
+// ===== PHASE INFO =====
+function getCurrentPhaseIdx(angle) {
+  var boundaries = [22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5];
+  for (var i = 0; i < boundaries.length; i++) {
+    if (angle < boundaries[i]) return i;
+  }
+  return 0;
+}
+
+function refreshUI() {
+  var angle = moonAngle;
+  var illum = (1 - Math.cos(angle * Math.PI / 180)) / 2;
+  var pct = Math.round(illum * 100);
+  var pidx = getCurrentPhaseIdx(angle);
+  var phase = PHASES[pidx];
+  var dayNum = Math.round(angle / 360 * 29.5) + 1;
+
+  // side panel
+  var mc = document.getElementById('moonCanvas');
+  var ctx = mc.getContext('2d');
+  ctx.clearRect(0, 0, mc.width, mc.height);
+  drawMoon(ctx, 55, 55, 46, angle);
+
+  document.getElementById('phaseNameZh').textContent = phase.name;
+  document.getElementById('phaseNameEn').textContent = phase.en;
+  document.getElementById('illuminPct').textContent = '亮面：' + pct + '%';
+  document.getElementById('lunarDate').textContent = phase.lunar;
+  document.getElementById('lunarDesc').textContent = '(農曆' + phase.lunar + ')';
+  document.getElementById('infoText').innerHTML = '<strong>' + phase.name + '</strong><br>' + phase.info;
+
+  // mobile drawer
+  var mcm = document.getElementById('moonCanvasMobile');
+  if (mcm) {
+    var ctxm = mcm.getContext('2d');
+    ctxm.clearRect(0, 0, mcm.width, mcm.height);
+    drawMoon(ctxm, 40, 40, 33, angle);
+  }
+  document.getElementById('phaseNameZhM').textContent = phase.name;
+  document.getElementById('phaseNameEnM').textContent = phase.en;
+  document.getElementById('illuminPctM').textContent = '亮面：' + pct + '%';
+  document.getElementById('lunarDateM').textContent = '農曆' + phase.lunar;
+  document.getElementById('infoTextM').innerHTML = '<strong>' + phase.name + '</strong><br>' + phase.info;
+  document.getElementById('drawerLabel').textContent = phase.name;
+
+  // day counter
+  document.getElementById('dayCounter').textContent = '第 ' + dayNum + ' 天';
+
+  // timeline sync
+  var tl = document.getElementById('timeline');
+  tl.value = Math.round(angle / 360 * 3600);
+
+  // highlight active phase dot
+  var dots = document.querySelectorAll('.phaseDot');
+  for (var di = 0; di < dots.length; di++) {
+    dots[di].classList.toggle('active', parseInt(dots[di].dataset.idx) === pidx);
+  }
+
+  // earth view
+  drawEarthView(angle);
+}
+
+// ===== PHASE GRID =====
+function buildPhaseGrid(containerId) {
+  var grid = document.getElementById(containerId);
+  grid.innerHTML = '';
+  for (var i = 0; i < PHASES.length; i++) {
+    var dot = document.createElement('div');
+    dot.className = 'phaseDot';
+    dot.dataset.idx = i;
+    dot.dataset.angle = PHASES[i].angle;
+
+    var cv = document.createElement('canvas');
+    cv.width = 40; cv.height = 40;
+    var ctx = cv.getContext('2d');
+    drawMoon(ctx, 20, 20, 17, PHASES[i].angle);
+    dot.appendChild(cv);
+
+    var sp = document.createElement('span');
+    sp.textContent = PHASES[i].name;
+    dot.appendChild(sp);
+
+    (function(angle) {
+      dot.addEventListener('click', function() {
+        moonAngle = angle;
+        isPlaying = false;
+        document.getElementById('btnPlay').innerHTML = '&#9654;';
+        refreshUI();
+      });
+    })(PHASES[i].angle);
+
+    grid.appendChild(dot);
+  }
+}
+
+buildPhaseGrid('phaseGrid');
+buildPhaseGrid('phaseGridM');
+
+// ===== CONTROLS =====
+document.getElementById('btnPlay').addEventListener('click', function() {
+  isPlaying = !isPlaying;
+  this.innerHTML = isPlaying ? '&#9646;&#9646;' : '&#9654;';
+});
+
+document.getElementById('timeline').addEventListener('input', function() {
+  moonAngle = (this.value / 3600) * 360;
+  isPlaying = false;
+  document.getElementById('btnPlay').innerHTML = '&#9654;';
+  refreshUI();
+});
+
+var speedBtns = document.querySelectorAll('.speed-btn');
+for (var sb = 0; sb < speedBtns.length; sb++) {
+  speedBtns[sb].addEventListener('click', function() {
+    speedVal = parseFloat(this.dataset.s);
+    for (var j = 0; j < speedBtns.length; j++) speedBtns[j].classList.remove('sel');
+    this.classList.add('sel');
+  });
+}
+
+// drawer
+document.getElementById('drawerHandle').addEventListener('click', function() {
+  drawerOpen = !drawerOpen;
+  document.getElementById('bottomDrawer').classList.toggle('open', drawerOpen);
+});
+
+// ===== QUIZ =====
+document.getElementById('btnQuiz').addEventListener('click', function() {
+  document.getElementById('quizOverlay').classList.add('show');
+  nextQuestion();
+});
+document.getElementById('quizClose').addEventListener('click', function() {
+  document.getElementById('quizOverlay').classList.remove('show');
+  quizCorrect = 0; quizTotal = 0;
+  document.getElementById('quizScore').textContent = '答對 0 / 0';
+});
+
+function nextQuestion() {
+  quizAnswered = false;
+  quizPhaseIdx = Math.floor(Math.random() * 8);
+
+  var qctx = document.getElementById('quizMoonCanvas').getContext('2d');
+  qctx.setTransform(1, 0, 0, 1, 0, 0);
+  qctx.globalCompositeOperation = 'source-over';
+  qctx.globalAlpha = 1;
+  qctx.clearRect(0, 0, 110, 110);
+  drawMoon(qctx, 55, 55, 46, PHASES[quizPhaseIdx].angle);
+
+  document.getElementById('quizFeedback').textContent = '';
+  document.getElementById('btnNextQ').style.display = 'none';
+  document.getElementById('quizQuestion').textContent = '這個月相的名稱是？';
+
+  // build options
+  var opts = [quizPhaseIdx];
+  while (opts.length < 4) {
+    var r = Math.floor(Math.random() * 8);
+    var dup = false;
+    for (var oi = 0; oi < opts.length; oi++) { if (opts[oi] === r) { dup = true; break; } }
+    if (!dup) opts.push(r);
+  }
+  // Fisher-Yates shuffle
+  for (var fi = opts.length - 1; fi > 0; fi--) {
+    var fj = Math.floor(Math.random() * (fi + 1));
+    var tmp = opts[fi]; opts[fi] = opts[fj]; opts[fj] = tmp;
+  }
+
+  var container = document.getElementById('quizOptions');
+  container.innerHTML = '';
+  for (var qi = 0; qi < opts.length; qi++) {
+    var btn = document.createElement('button');
+    btn.className = 'quiz-opt';
+    btn.textContent = PHASES[opts[qi]].name;
+    btn.dataset.pidx = opts[qi];
+    btn.addEventListener('click', onQuizAnswer);
+    container.appendChild(btn);
+  }
+}
+
+function onQuizAnswer() {
+  if (quizAnswered) return;
+  quizAnswered = true;
+  quizTotal++;
+  var chosen = parseInt(this.dataset.pidx);
+  var allBtns = document.querySelectorAll('.quiz-opt');
+
+  if (chosen === quizPhaseIdx) {
+    quizCorrect++;
+    this.classList.add('correct');
+    document.getElementById('quizFeedback').innerHTML =
+      '答對！ ' + PHASES[quizPhaseIdx].name + ' (' + PHASES[quizPhaseIdx].en + ')<br>' +
+      '<span style="font-size:.78rem;color:rgba(160,220,180,0.75);">' + PHASES[quizPhaseIdx].info + '</span>';
+    launchConfetti();
+  } else {
+    this.classList.add('wrong');
+    for (var bi = 0; bi < allBtns.length; bi++) {
+      if (parseInt(allBtns[bi].dataset.pidx) === quizPhaseIdx) {
+        allBtns[bi].classList.add('correct');
+      }
+    }
+    document.getElementById('quizFeedback').innerHTML =
+      '再想想！正確答案是 ' + PHASES[quizPhaseIdx].name + '<br>' +
+      '<span style="font-size:.78rem;color:rgba(220,160,160,0.75);">' + PHASES[quizPhaseIdx].info + '</span>';
+  }
+
+  document.getElementById('quizScore').textContent = '答對 ' + quizCorrect + ' / ' + quizTotal;
+  document.getElementById('btnNextQ').style.display = 'block';
+}
+
+document.getElementById('btnNextQ').addEventListener('click', function() {
+  this.style.display = 'none';
+  nextQuestion();
+});
+
+// ===== OBSERVER MODE =====
+var observerMode = false;
+var obStars = [];
+(function() {
+  var rng = 1;
+  function rand() { rng = (rng * 16807 + 0) % 2147483647; return (rng - 1) / 2147483646; }
+  for (var si = 0; si < 280; si++) {
+    obStars.push({x: rand(), y: rand() * 0.85, r: rand() * 1.3 + 0.3, a: rand() * 0.7 + 0.3});
+  }
+})();
+
+var VIEW_TIMES = [
+  '正午 12:00（新月，月亮與太陽同向，白天不可見）',
+  '傍晚 18:00（眉形月，日落後西方低空）',
+  '傍晚 18:00（上弦月，日落後南方高空）',
+  '晚上 21:00（盈凸月，日落後東南方）',
+  '子夜 00:00（滿月，子夜南方最高點）',
+  '凌晨 03:00（虧凸月，半夜後東南方）',
+  '清晨 06:00（下弦月，日出前南方）',
+  '清晨 06:00（殘月，日出前東方低空）'
+];
+
+function drawObserverView(angle) {
+  var oc = document.getElementById('observerCanvas');
+  if (!oc) return;
+  var W = oc.clientWidth || 600;
+  var H = oc.clientHeight || 400;
+  if (oc.width !== W || oc.height !== H) { oc.width = W; oc.height = H; }
+  var ctx = oc.getContext('2d');
+
+  var horizonY = H * 0.68;
+  var PI = Math.PI;
+
+  // ---- MOON SKY POSITION (midnight view, facing south) ----
+  // Moon transit hour = moonAngle/15 + 12 (mod 24)
+  var transitHour = (angle / 15 + 12) % 24;
+  var hourAngleHours = (24 - transitHour) % 24;
+  if (hourAngleHours > 12) hourAngleHours -= 24;
+  var hourAngleRad = hourAngleHours * 15 * PI / 180;
+
+  // Altitude: simplified, peak 65deg for Taiwan latitude, drops to 0 at horizon
+  var altFrac = Math.cos(hourAngleRad);  // +1=meridian(south/high), 0=horizon, -1=north(below)
+  var moonVisible = altFrac > -0.05;
+
+  // Screen coords: east=left, west=right, south=center
+  var moonX = W * 0.5 + Math.sin(hourAngleRad) * W * 0.4;
+  var moonY = horizonY - altFrac * (horizonY - H * 0.10);
+  var moonR = Math.max(16, Math.min(W, H) * 0.055);
+
+  // ---- SKY ----
+  var skyG = ctx.createLinearGradient(0, 0, 0, horizonY);
+  skyG.addColorStop(0, '#010812');
+  skyG.addColorStop(0.7, '#030e20');
+  skyG.addColorStop(1, '#071828');
+  ctx.fillStyle = skyG;
+  ctx.fillRect(0, 0, W, horizonY);
+
+  // Moonlight glow in sky
+  if (moonVisible && altFrac > 0.1) {
+    var illumFrac = (1 - Math.cos(angle * PI / 180)) / 2;
+    var mgW = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, W * 0.25);
+    mgW.addColorStop(0, 'rgba(180,200,240,' + (illumFrac * 0.08) + ')');
+    mgW.addColorStop(1, 'rgba(100,140,200,0)');
+    ctx.fillStyle = mgW;
+    ctx.fillRect(0, 0, W, horizonY);
+  }
+
+  // ---- STARS ----
+  for (var si = 0; si < obStars.length; si++) {
+    var s = obStars[si];
+    var sx = s.x * W;
+    var sy = s.y * horizonY;
+    // Dim stars near moon position if bright moon
+    var illumS = (1 - Math.cos(angle * PI / 180)) / 2;
+    var dx = sx - moonX, dy = sy - moonY;
+    var distToMoon = Math.sqrt(dx*dx + dy*dy) / (W * 0.15);
+    var dimFactor = moonVisible ? Math.min(1, distToMoon / (1 + illumS * 3)) : 1;
+    ctx.globalAlpha = s.a * dimFactor;
+    ctx.fillStyle = '#c8d8f0';
+    ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ---- DIRECTION LABELS ----
+  ctx.font = '0.72rem Segoe UI, Arial, sans-serif';
+  ctx.fillStyle = 'rgba(120,160,200,0.5)';
+  ctx.textAlign = 'center';
+  ctx.fillText('東', W * 0.08, horizonY - 10);
+  ctx.fillText('南', W * 0.50, horizonY - 10);
+  ctx.fillText('西', W * 0.92, horizonY - 10);
+
+  // ---- MOON ----
+  if (moonVisible) {
+    if (altFrac > 0) {
+      drawMoon(ctx, moonX, moonY, moonR, angle);
+    } else {
+      // Near horizon: show partial rise/set with fade
+      ctx.save();
+      ctx.rect(0, 0, W, horizonY);
+      ctx.clip();
+      drawMoon(ctx, moonX, moonY, moonR, angle);
+      ctx.restore();
+    }
+    // Moon label
+    ctx.fillStyle = 'rgba(200,220,255,0.65)';
+    ctx.font = '0.68rem Segoe UI,Arial,sans-serif';
+    ctx.textAlign = 'center';
+    var pidx = getCurrentPhaseIdx(angle);
+    ctx.fillText(PHASES[pidx].name, moonX, moonY - moonR - 10);
+  }
+
+  // ---- HORIZON LINE ----
+  ctx.strokeStyle = 'rgba(50,100,60,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, horizonY); ctx.lineTo(W, horizonY); ctx.stroke();
+
+  // ---- TERRAIN SILHOUETTE ----
+  ctx.fillStyle = '#0a1508';
+  ctx.beginPath();
+  ctx.moveTo(0, horizonY);
+  // Simple rolling hills
+  var pts = [0,0, 0.05,-.012, 0.12,-.008, 0.18,-.022, 0.25,-.005, 0.32,-.018, 0.40,-.010,
+             0.48,-.025, 0.55,-.008, 0.62,-.020, 0.70,-.005, 0.78,-.015, 0.85,-.008, 0.92,-.018, 1,0];
+  for (var pi2 = 0; pi2 < pts.length; pi2 += 2) {
+    ctx.lineTo(pts[pi2] * W, horizonY + pts[pi2+1] * H);
+  }
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+  ctx.fill();
+
+  // ---- GROUND ----
+  var groundG = ctx.createLinearGradient(0, horizonY, 0, H);
+  groundG.addColorStop(0, '#0d1f0a');
+  groundG.addColorStop(1, '#060e04');
+  ctx.fillStyle = groundG;
+  ctx.fillRect(0, horizonY, W, H - horizonY);
+
+  // ---- PERSON SILHOUETTE ----
+  var px = W * 0.15;
+  var py = horizonY;
+  var ph = H * 0.13;
+  ctx.fillStyle = '#080e06';
+  // body
+  ctx.beginPath();
+  ctx.moveTo(px - ph*0.12, py);
+  ctx.lineTo(px - ph*0.08, py - ph*0.5);
+  ctx.lineTo(px + ph*0.08, py - ph*0.5);
+  ctx.lineTo(px + ph*0.12, py);
+  ctx.closePath(); ctx.fill();
+  // head
+  ctx.beginPath(); ctx.arc(px, py - ph*0.62, ph*0.13, 0, PI*2); ctx.fill();
+  // arm pointing up at moon
+  var aimAngle = moonVisible ? Math.atan2(moonY - (py - ph*0.5), moonX - px) : -PI/4;
+  ctx.strokeStyle = '#080e06';
+  ctx.lineWidth = ph * 0.07;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(px + ph*0.08, py - ph*0.4);
+  ctx.lineTo(px + Math.cos(aimAngle)*ph*0.45, py - ph*0.4 + Math.sin(aimAngle)*ph*0.45);
+  ctx.stroke();
+
+  // ---- NEW MOON MESSAGE ----
+  if (!moonVisible && altFrac < 0) {
+    ctx.fillStyle = 'rgba(160,190,230,0.55)';
+    ctx.font = '1rem Segoe UI,Arial,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('今晚看不到月亮', W * 0.5, H * 0.42);
+    ctx.font = '0.75rem Segoe UI,Arial,sans-serif';
+    ctx.fillStyle = 'rgba(120,150,190,0.4)';
+    ctx.fillText('（月球與太陽同方向）', W * 0.5, H * 0.49);
+  }
+
+  // ---- UPDATE INFO BAR ----
+  var pidx2 = getCurrentPhaseIdx(angle);
+  var timeStr = VIEW_TIMES[pidx2] ? VIEW_TIMES[pidx2] : '';
+  var infoEl = document.getElementById('observerInfo');
+  if (infoEl) infoEl.textContent = timeStr;
+}
+
+document.getElementById('btnView').addEventListener('click', function() {
+  observerMode = !observerMode;
+  var ov = document.getElementById('observerView');
+  ov.style.display = observerMode ? 'block' : 'none';
+  // hide/show 3D labels & thumbnail
+  var labels = document.querySelectorAll('.label3d');
+  for (var li = 0; li < labels.length; li++) {
+    labels[li].style.display = observerMode ? 'none' : '';
+  }
+  document.getElementById('earthViewWrap').style.display = observerMode ? 'none' : '';
+  this.textContent = observerMode ? '宇宙視角' : '地球視角';
+  this.style.background = observerMode ? 'rgba(79,163,224,0.3)' : '';
+  if (observerMode) drawObserverView(moonAngle);
+});
+
+// ===== CONFETTI =====
+var confCanvas = document.getElementById('confettiCanvas');
+var confCtx = confCanvas.getContext('2d');
+confCanvas.width = window.innerWidth;
+confCanvas.height = window.innerHeight;
+window.addEventListener('resize', function() {
+  confCanvas.width = window.innerWidth;
+  confCanvas.height = window.innerHeight;
+});
+
+var confColors = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#c77dff','#ff9a3c'];
+
+function launchConfetti() {
+  confettiParticles = [];
+  for (var ci = 0; ci < 80; ci++) {
+    confettiParticles.push({
+      x: Math.random() * confCanvas.width,
+      y: -10,
+      vx: (Math.random() - 0.5) * 4,
+      vy: Math.random() * 4 + 2,
+      size: Math.random() * 7 + 3,
+      color: confColors[Math.floor(Math.random() * confColors.length)],
+      rot: Math.random() * 360,
+      rotV: (Math.random() - 0.5) * 8
+    });
+  }
+}
+
+function updateConfetti() {
+  if (confettiParticles.length === 0) {
+    confCtx.clearRect(0, 0, confCanvas.width, confCanvas.height);
+    return;
+  }
+  confCtx.clearRect(0, 0, confCanvas.width, confCanvas.height);
+  var alive = [];
+  for (var pi = 0; pi < confettiParticles.length; pi++) {
+    var p = confettiParticles[pi];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.rot += p.rotV;
+    if (p.y < confCanvas.height + 20) {
+      alive.push(p);
+      confCtx.save();
+      confCtx.translate(p.x, p.y);
+      confCtx.rotate(p.rot * Math.PI / 180);
+      confCtx.fillStyle = p.color;
+      confCtx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+      confCtx.restore();
+    }
+  }
+  confettiParticles = alive;
+}
+
+// ===== ANIMATE =====
+(function loop() {
+  requestAnimationFrame(loop);
+  if (isPlaying) {
+    moonAngle = (moonAngle + speedVal * 0.35) % 360;
+  }
+  orbitGroup.rotation.y = moonAngle * Math.PI / 180;
+  earthMesh.rotation.y += 0.002;
+  renderer.render(scene, camera);
+  updateLabels();
+  refreshUI();
+  if (observerMode) drawObserverView(moonAngle);
+  updateConfetti();
+})();
+
+// initial render
+refreshUI();
+</script>
+</body>
+</html>
